@@ -1,4 +1,5 @@
 import pygame
+from tkinter import *
 
 # User-defined functions
 
@@ -28,8 +29,8 @@ class Game:
       # Initialize a Game.
       # - self is the Game to initialize
       # - surface is the display window surface object
-
-      # === objects that are part of every game that we will discuss
+      self.root = self.initialize_window("Menu", "300x325")
+      self.game_mode = None
       self.surface = surface
       self.screen = screen
       self.bg_color = pygame.Color('black')
@@ -37,9 +38,8 @@ class Game:
       self.FPS = 60
       self.close_clicked = False
       self.continue_game = True
-      
-      # === game specific objects
-      self.paddles = {'left': Paddle(self.surface, 'white', 100, 200, 10, 50, [0,5]), 'right': Paddle(self.surface, 'white', 400, 200, 10, 50, [0,5])}
+ 
+      self.paddles = {'left': Paddle(self.surface, 'white', 100, 200, 10, 50, [0,5], True), 'right': Paddle(self.surface, 'white', 400, 200, 10, 50, [0,5], True), 'bot':Paddle(self.surface, 'white', 400, 200, 10, 50, [0,5], False)}
       self.ball = Ball('white', 7, [250, 200], [5, 5], self.surface, self.paddles['right'])
       self.game_score = {'left': 0, 'right': 0}
       self.paddle_input = {'left':(pygame.K_q, pygame.K_a), 'right':(pygame.K_p, pygame.K_l)}
@@ -50,6 +50,8 @@ class Game:
    def play(self):
       # Play the game until the player presses the close box.
       # - self is the Game that should be continued or not.
+      self.menu() # the player choses single or multiplayer
+      self.set_paddles()
 
       while not self.close_clicked:  # until player clicks close box
          # play frame
@@ -59,6 +61,49 @@ class Game:
             self.update()
             self.decide_continue()
          self.game_Clock.tick(self.FPS) # run at most with FPS Frames Per Second 
+
+   def initialize_window(self, title, size):
+      # initializes tkinter window
+      # - self is the window
+      # - title is the windows title 
+      # - size is the length x width of the window
+      root = Tk()
+      root.title(title)
+      root.geometry(size)
+      root.resizable(0, 0)
+      root.config(bg='#23272A')
+      return root
+
+   def set_mode(self, mode):
+      # Sets the gamemode and destroys the menu
+      # - self is the game
+      # - mode is the chosen gamemode
+      self.game_mode = mode
+      self.root.destroy()
+
+   def set_paddles(self):
+      # Sets the paddles based on the game mode
+      # - self is the game where the paddles are located
+      self.left_paddle = self.paddles['left']
+      if self.game_mode == 'multiplayer':
+         self.right_paddle = self.paddles['right']
+      elif self.game_mode == 'singleplayer':
+         # in singleplayer right paddle becomes a bot
+         self.right_paddle = self.paddles['bot']
+      
+   def menu(self):
+      # Creates the widgets on the menu
+      # - self is the menu window
+      Label(self.root, text="Left Paddle: Q and A to move", pady=5, bg='#99AAB5').grid(row=0, pady=5)
+      Label(self.root, text="Right Paddle: P and L to move", pady=5, bg='#99AAB5').grid(row=1, pady=5)
+      Label(self.root, text="First to 11 Wins!", pady=5, bg='#99AAB5').grid(row=2, pady=5)
+      single_player_button = Button(self.root, text='Singleplayer', font='Arial', padx=35, pady=25, bg='#99AAB5', activebackground='#2C2F33', command=lambda: self.set_mode('singleplayer'))
+      multiplayer_player_button = Button(self.root, text='Local Multiplayer', font='Arial', padx=20, pady=25, bg='#99AAB5', activebackground='#2C2F33', command=lambda: self.set_mode('multiplayer'))
+
+      single_player_button.grid(row=3, padx=70, pady=15)
+      multiplayer_player_button.grid(row=4)
+
+      self.root.mainloop()
    
    def score_text(self, text_string, text_font, text_color, text_pos):
       # Creates a text to be displayed on the screen 
@@ -70,7 +115,6 @@ class Game:
 
       text_image = text_font.render(text_string, True , text_color)
       self.screen.blit(text_image, text_pos)
-
 
    def handle_events(self):
       # Handle each user event by changing the game state appropriately.
@@ -91,7 +135,6 @@ class Game:
 
       if (self.ball.center[0] == 0):
          self.game_score['right'] += 1
-
       
    def draw(self):
       # Draw all game objects.
@@ -105,8 +148,8 @@ class Game:
 
       # draw game objects
       self.ball.draw()
-      self.paddles['left'].draw()
-      self.paddles['right'].draw()
+      self.left_paddle.draw()
+      self.right_paddle.draw()
 
       # draw players points
       pygame.display.update() # make the updated surface appear on the display
@@ -116,15 +159,15 @@ class Game:
       # - self is the Game to update
       
       # check if ball hits the paddle
-      self.ball.bounce(self.paddles['left'], self.paddles['right'])
+      self.ball.bounce(self.left_paddle, self.right_paddle)
 
       # move the ball and keeps it in bounds
       self.ball.move()
       self.player_points()
 
       # moves paddles from user input
-      self.paddles['left'].move(self.paddle_input['left'])
-      self.paddles['right'].move(self.paddle_input['right'])
+      self.left_paddle.move(self.paddle_input['left'])
+      self.right_paddle.move(self.paddle_input['right'], self.ball.get_center()[1])
 
 
    def decide_continue(self):
@@ -134,6 +177,7 @@ class Game:
 
       if self.game_score['left'] > 10 or self.game_score['left'] > 10:
          self.continue_game = False
+
 
 class Ball:
    # An object in this class represents the ball in the game 
@@ -169,7 +213,6 @@ class Ball:
          if (self.center[i] == 0 or self.center[i] == self.screen_size[i]):
             self.velocity[i] = -self.velocity[i]
 
-   
    def draw(self):
       # Draw the ball on the surface
       # - self is the Ball to draw
@@ -188,43 +231,55 @@ class Ball:
       if (paddle2.check_collision(self.center) and self.velocity[0] == abs(self.velocity[0])):
          self.velocity[0] = -self.velocity[0]
 
+   def get_center(self):
+      return self.center
+
 
 class Paddle:
    # An object in this class represents the players paddles
    
-   def __init__(self, paddle_surface, paddle_color, x, y, width, height, paddle_velocity):
+   def __init__(self, paddle_surface, paddle_color, x, y, width, height, paddle_velocity, user):
       # Initialize a Paddle.
       # - self is the Paddle to be initialized
       # - paddle_surface is the window's pygame.Surface object
       # - paddle_color is the pygame.Color of the paddle
       # - x,y,width,height is the pygame rect parameters
       # - paddle_velocity is the speed at which the paddle moves
+      # - user is a bool determining if their is a user or a bot
 
       self.surface = paddle_surface
       self.color = pygame.Color(paddle_color)
       self.rect = pygame.Rect(x,y,width,height)
       self.velocity = paddle_velocity
+      self.user = user
 
    def draw(self):
       # Draw the paddle to the screen
       # - self is the Paddle to be drawn
       pygame.draw.rect(self.surface, self.color, self.rect)
 
-   def move(self, paddle_input):
+   def move(self, paddle_input, ball_y=1):
       # Takes in user input and moves the paddle up or down the y-axis
       # - self is the Paddle to be moved
       # - paddle_input is the up and down keyboard input for the paddle stored in a list
+      # - ball_y is the y position of the game ball, this is used for singleplayer gamemode where there is an AI
 
-      # move up
-      if (pygame.key.get_pressed()[paddle_input[0]]):
-         self.rect = self.rect.move(self.velocity[0], -self.velocity[1])
+      if self.user:
+         # move up
+         if (pygame.key.get_pressed()[paddle_input[0]]):
+            self.rect = self.rect.move(self.velocity[0], -self.velocity[1])
+
+         # move down
+         if (pygame.key.get_pressed()[paddle_input[1]]):
+            self.rect = self.rect.move(self.velocity[0], self.velocity[1])
+      else:
+         # Move bot based on position of ball, this creates an unbeatable AI
+         self.rect.y = ball_y
+
       # check if top is in bounds
       if (self.rect.top <= 0):
          self.rect.top = 0
 
-      # move down
-      if (pygame.key.get_pressed()[paddle_input[1]]):
-         self.rect = self.rect.move(self.velocity[0], self.velocity[1])
       # check if bottom is in bounds
       if (self.rect.bottom >= 400):
          self.rect.bottom = 400
